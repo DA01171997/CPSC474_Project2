@@ -3,6 +3,7 @@
 #include <thread>
 #include <mutex>
 #include <queue>
+#include <chrono>
 #include "mpi.h"
 #include "stddef.h"
 
@@ -68,14 +69,16 @@ class Node
 {
     private:
         int m_rank;
+        int test =0;
         std::string m_name="";
         std::vector<int> m_neighbore;
         std::vector<int> m_buffer;
+        std::queue<Message> m_recv_queue;
+        std::queue<Message> m_send_queue;
         std::thread* m_recv_thread;
         std::thread* m_send_thread;
         std::thread* m_process_thread;
-        std::queue<Message> m_recv_queue;
-        std::queue<Message> m_send_queue;
+        
     public:
         Node(){}
         Node(int rank): m_rank(rank) {}
@@ -94,14 +97,35 @@ class Node
         }
         ~Node()
         {
-            // if(m_recv_thread->joinable()) {m_recv_thread->join();}
-            // if(m_send_thread->joinable()) {m_send_thread->join();}
-            // if(m_process_thread->joinable()) {m_process_thread->join();}
-            
+            terminateThreads();
+        }
+
+        void change()
+        {   
+            test =4;
         }
         int getRank() const {return m_rank;}
 
-        bool startThreads()
+        void Receive()
+        {
+            if(m_rank==4)
+            {
+                std::cout<<"value before : " << test << "\n";
+                std::this_thread::sleep_for(std::chrono::seconds(5));
+                std::cout<<"value before : " << test << "\n";
+            }
+        }
+
+        void Send()
+        {
+
+        }
+
+        void Process()
+        {
+
+        }
+        void startThreads()
         {
             if (!m_recv_thread)
             {
@@ -116,43 +140,27 @@ class Node
                 m_process_thread = new std::thread(&Node::Process, this);
             }
         }
-        
-        void Receive()
-        {
-
-        }
-
-        void Send()
-        {
-
-        }
-
-        void Process()
-        {
-
-        }
 
         void terminateThreads() 
         {
-            if (m_recv_thread)
+            if ((m_recv_thread)&&(m_recv_thread->joinable()))
             {
                 m_recv_thread->join();
                 delete m_recv_thread; 
                 m_recv_thread = NULL;
             }
-            if (m_send_thread)
+            if ((m_send_thread)&&(m_send_thread->joinable()))
             {
                 m_send_thread->join();
                 delete m_send_thread;
                 m_send_thread = NULL;
             }
-            if (m_process_thread)
+            if ((m_process_thread)&&(m_process_thread->joinable()))
             {
-                m_send_thread->join();
-                m_process_thread = NULL;
+                m_process_thread->join();
+                delete m_process_thread;
                 m_process_thread = NULL;
             }
-
         }
 
 };
@@ -238,11 +246,23 @@ int main(int argc, char * argv[])
                 flag=false;
             }
         }
-        //std::cout << "Rank: " << node.getRank() << " Message_Type: " << recv_msg.getMessageTypeStr() << " source: " << recv_msg.m_source << " data: " << recv_msg.m_data << "\n";
-        node.startThreads();
-        node.terminateThreads();
+        std::cout << "Rank: " << node.getRank() << " Message_Type: " << recv_msg.getMessageTypeStr() << " source: " << recv_msg.m_source << " data: " << recv_msg.m_data << "\n";
+        
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+    try 
+    {
+        node.startThreads();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        node.change();
+    } catch (...)
+    {
+        node.terminateThreads();
+        throw;
+    }
+    
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
     delete node_ptr;

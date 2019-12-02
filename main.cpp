@@ -78,7 +78,7 @@ class Node
         std::thread* m_recv_thread;
         std::thread* m_send_thread;
         std::thread* m_process_thread;
-        
+        std::mutex m_mutex;
     public:
         Node(){}
         Node(int rank): m_rank(rank) {}

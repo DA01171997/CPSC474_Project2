@@ -9,81 +9,94 @@
 #include "stddef.h"
 
 
-struct Message {
-    enum Message_Type {
-        End = 0,
-        WakeUp = 1,
-        Control = 2,
-        Announce = 3,
-        Invalid_Type = 4
-    };
-    int m_type=0;
-    int m_data=0;
-    int m_source=0;
+class Node 
+{       
+    public:
+        struct Message {
+            enum Message_Type {
+                End = 0,
+                WakeUp = 1,
+                Control = 2,
+                Announce = 3,
+                Invalid_Type = 4
+            };
+            int m_type=0;
+            int m_data=0;
+            int m_source=0;
 
-    Message(Message_Type type, int source, int data = 0) :  m_type(static_cast<int>(type)),
+            Message(Message_Type type, int source, int data = 0) :  m_type(static_cast<int>(type)),
+                                                                    m_source(source),
+                                                                    m_data(data)
+            {
+            }
+            Message(int type, int source, int data = 0) :   m_type(type),
                                                             m_source(source),
                                                             m_data(data)
-    {
-    }
-    Message(int type, int source, int data = 0) :   m_type(type),
-                                                    m_source(source),
-                                                    m_data(data)
-    {
-    }
-    Message() {}
-    std::string getMessageTypeStr() const
-    {   
-        switch(m_type)
-        {
-            case 0:
-                return "End";
-            case 1:
-                return "WakeUp";
-            case 2:
-                return "Control";
-            case 3:
-                return "Announce";
-            default:
-                return "Invalid Type";
-        }
-    }
-    Message_Type getMessageType() const
-    {   
-        switch(m_type)
-        {
-            case 0:
-                return Message_Type::End;
-            case 1:
-                return Message_Type::WakeUp;
-            case 2:
-                return Message_Type::Control;
-            case 3:
-                return Message_Type::Announce;
-            default:
-                return Message_Type::Invalid_Type;
-        }
-    }
-};
+            {
+            }
+            Message() {}
+            std::string getMessageTypeStr() const
+            {   
+                switch(m_type)
+                {
+                    case 0:
+                        return "End";
+                    case 1:
+                        return "WakeUp";
+                    case 2:
+                        return "Control";
+                    case 3:
+                        return "Announce";
+                    default:
+                        return "Invalid Type";
+                }
+            }
+            Message_Type getMessageType() const
+            {   
+                switch(m_type)
+                {
+                    case 0:
+                        return Message_Type::End;
+                    case 1:
+                        return Message_Type::WakeUp;
+                    case 2:
+                        return Message_Type::Control;
+                    case 3:
+                        return Message_Type::Announce;
+                    default:
+                        return Message_Type::Invalid_Type;
+                }
+            }
+        };
 
-class Node 
-{
-    private:
-        int m_rank;
-        int test =0;
-        std::string m_name="";
-        std::vector<int> m_neighbore;
-        std::vector<int> m_buffer;
-        std::queue<Message> m_recv_queue;
-        std::queue<Message> m_send_queue;
-        std::thread* m_recv_thread;
-        std::thread* m_send_thread;
-        std::thread* m_process_thread;
-        std::mutex m_mutex;
-        std::condition_variable m_condV;
-    public:
-        Node(){}
-        Node(int rank): m_rank(rank) {}
+        Node(){
+            int struct_member_variable_counter = 3;
+            int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1};
+            MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT};
+            MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] {offsetof(Message,m_type), offsetof(Message,m_data),offsetof(Message,m_source)};
+            MPI_Datatype message_struct;
+            MPI_Type_create_struct( struct_member_variable_counter, 
+                                struct_member_variable_block_lengths,
+                                struct_member_variable_displacement,
+                                struct_member_variable_type_array,
+                                &message_struct
+                                );
+            MPI_Type_commit(&message_struct);
+        }
+        Node(int rank): m_rank(rank) {
+            int struct_member_variable_counter = 3;
+            int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1};
+            MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT};
+            MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] {offsetof(Message,m_type), offsetof(Message,m_data),offsetof(Message,m_source)};
+            MPI_Datatype message_struct;
+            MPI_Type_create_struct( struct_member_variable_counter, 
+                                struct_member_variable_block_lengths,
+                                struct_member_variable_displacement,
+                                struct_member_variable_type_array,
+                                &message_struct
+                                );
+            MPI_Type_commit(&message_struct);
+        }
         Node(int rank, const std::string& name, const std::vector<int>& neighbore): m_rank(rank), 
                                                                                     m_name(name), 
                                                                                     m_neighbore(neighbore)
@@ -96,10 +109,24 @@ class Node
             }
             validate_message += "\n";
             // std::cout << validate_message;
+            int struct_member_variable_counter = 3;
+            int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1};
+            MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT};
+            MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] {offsetof(Message,m_type), offsetof(Message,m_data),offsetof(Message,m_source)};
+            MPI_Datatype message_struct;
+            MPI_Type_create_struct( struct_member_variable_counter, 
+                                struct_member_variable_block_lengths,
+                                struct_member_variable_displacement,
+                                struct_member_variable_type_array,
+                                &message_struct
+                                );
+            MPI_Type_commit(&message_struct);
         }
         ~Node()
         {
-            terminateThreads();
+            // terminateThreads();
+            // delete m_recv_msg;
+            // m_recv_msg = NULL;
         }
 
         void change()
@@ -118,34 +145,71 @@ class Node
 
         void Receive()
         {
-            if(m_rank==4)
+            // if(m_rank==4)
+            // {
+            //     bool flag = true;
+            //     int counter = 0;
+            //     // while (counter <2){
+            //     //     std::unique_lock<std::mutex> locker(m_mutex);
+            //     //     std::cout<<"value before : " << test << "\n";
+            //     //     std::this_thread::sleep_for(std::chrono::seconds(3));
+            //     //     counter++;
+            //     // }
+            //     std::cout<<"value after1 : " << test << "\n";
+            //     std::unique_lock<std::mutex> locker(m_mutex);
+            //     while (flag){
+            //         m_condV.wait(locker);
+            //         if (test!=0){
+            //             std::cout<<"value after2 : " << test << "\n";
+            //             flag = false;
+            //         }
+                    
+            //     }
+            
+            // } int
+
+            int blah=0;
+            int counter = 0;
+            if (m_rank==3) 
             {
-                bool flag = true;
-                int counter = 0;
-                // while (counter <2){
-                //     std::unique_lock<std::mutex> locker(m_mutex);
-                //     std::cout<<"value before : " << test << "\n";
-                //     std::this_thread::sleep_for(std::chrono::seconds(3));
-                //     counter++;
-                // }
-                std::cout<<"value after1 : " << test << "\n";
-                std::unique_lock<std::mutex> locker(m_mutex);
-                while (flag){
-                    m_condV.wait(locker);
-                    if (test!=0){
-                        std::cout<<"value after2 : " << test << "\n";
-                        flag = false;
-                    }
-                    
-                }
-                
-                
-                // while(test==0)
-                // {
-                    
-                // }
-                
+                blah=2;
+                MPI_Send(&blah,1, MPI_INT, 2, 0, MPI_COMM_WORLD);
+                // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
             }
+            if (m_rank==4) 
+            {
+                blah=4;
+                MPI_Send(&blah,1, MPI_INT, 2, 0, MPI_COMM_WORLD);
+                // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
+            }
+            if (m_rank==2) {
+                       
+                while((blah==0) || (counter <10))
+                {
+                    try 
+                    {                
+                        MPI_Recv(&blah,1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                        // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
+                        std::cout<< "value : " << blah << "\n";
+                        std::this_thread::sleep_for(std::chrono::seconds(3));
+                    } catch (...)
+                    {
+                        // terminateThreads();
+                        throw;
+                    }
+                    counter++;
+                }
+            }  
+            
+            
+            // bool flag = true;
+            
+            // while (flag)
+            // {   
+            //     m_recv_msg = new Message();
+            //     
+            //     std::cout<<"HERE\n";
+            // }
         }
 
         void Send()
@@ -159,6 +223,7 @@ class Node
         }
         void startThreads()
         {
+            
             if (!m_recv_thread)
             {
                 m_recv_thread = new std::thread(&Node::Receive, this);
@@ -194,7 +259,21 @@ class Node
                 m_process_thread = NULL;
             }
         }
-
+    private:
+        int m_rank;
+        int test =0;
+        std::string m_name="";
+        std::vector<int> m_neighbore;
+        std::vector<int> m_buffer;
+        std::queue<Message> m_recv_queue;
+        std::queue<Message> m_send_queue;
+        std::thread* m_recv_thread;
+        std::thread* m_send_thread;
+        std::thread* m_process_thread;
+        std::mutex m_mutex;
+        std::condition_variable m_condV;
+        MPI_Datatype message_struct;
+        Message m_recv_msg; 
 };
 
 
@@ -212,18 +291,18 @@ int main(int argc, char * argv[])
     }
 
     // Create MPI_Datatype for the Message Struct
-    int struct_member_variable_counter = 3;
-    int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1};
-    MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT};
-    MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] {offsetof(Message,m_type), offsetof(Message,m_data),offsetof(Message,m_source)};
-    MPI_Datatype message_struct;
-    MPI_Type_create_struct( struct_member_variable_counter, 
-                            struct_member_variable_block_lengths,
-                            struct_member_variable_displacement,
-                            struct_member_variable_type_array,
-                            &message_struct
-                            );
-    MPI_Type_commit(&message_struct);
+    // int struct_member_variable_counter = 3;
+    // int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1};
+    // MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT};
+    // MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] {offsetof(Message,m_type), offsetof(Message,m_data),offsetof(Message,m_source)};
+    // MPI_Datatype message_struct;
+    // MPI_Type_create_struct( struct_member_variable_counter, 
+    //                         struct_member_variable_block_lengths,
+    //                         struct_member_variable_displacement,
+    //                         struct_member_variable_type_array,
+    //                         &message_struct
+    //                         );
+    // MPI_Type_commit(&message_struct);
 
     // Initialize the topology of each process base on rank
     std::vector<int> neighbore1 {4};
@@ -244,58 +323,61 @@ int main(int argc, char * argv[])
     Node& node = (*node_ptr);
 
     // Node's rank == 0 starts the Wakeup Process when user entered "start".
-    if(node.getRank()==0)
-    {
-        std::string command;
-        bool flag = true;
-        while (flag) 
-        {
-            std::cout << "Type \"start\" to start: ";
-            std::cin >> command;
-            if (command=="start")
-            {
-                Message wake_up_msg(Message::WakeUp, rank, 9);
-                MPI_Bcast(&wake_up_msg,1, message_struct,0, MPI_COMM_WORLD);
-                flag=false;
-            }
-            else
-            {
-                std::cout << "Type \"start\" to start"<< std::endl;
-            }
-        }   
-    }
+    // if(node.getRank()==0)
+    // {
+    //     std::string command;
+    //     bool flag = true;
+    //     while (flag) 
+    //     {
+    //         std::cout << "Type \"start\" to start: ";
+    //         std::cin >> command;
+    //         if (command=="start")
+    //         {
+    //             Message wake_up_msg(Message::WakeUp, rank, 9);
+    //             MPI_Bcast(&wake_up_msg,1, message_struct,0, MPI_COMM_WORLD);
+    //             flag=false;
+    //         }
+    //         else
+    //         {
+    //             std::cout << "Type \"start\" to start"<< std::endl;
+    //         }
+    //     }   
+    // }
 
-    // Node's rank !=0 will wait for the WakeUp message.
-    if((node.getRank()!=0))
-    {
-        bool flag = true;
-        Message recv_msg;
-        while (flag)
-        {   
-            MPI_Bcast(&recv_msg,1, message_struct,0, MPI_COMM_WORLD);
-            if (recv_msg.getMessageType() == Message::Message_Type::WakeUp)
-            {
-                flag=false;
-            }
-        }
-        // std::cout << "Rank: " << node.getRank() << " Message_Type: " << recv_msg.getMessageTypeStr() << " source: " << recv_msg.m_source << " data: " << recv_msg.m_data << "\n";
+    // // Node's rank !=0 will wait for the WakeUp message.
+    // if((node.getRank()!=0))
+    // {
+    //     bool flag = true;
+    //     Message recv_msg;
+    //     while (flag)
+    //     {   
+    //         MPI_Bcast(&recv_msg,1, message_struct,0, MPI_COMM_WORLD);
+    //         if (recv_msg.getMessageType() == Message::Message_Type::WakeUp)
+    //         {
+    //             flag=false;
+    //         }
+    //     }
+    //     // std::cout << "Rank: " << node.getRank() << " Message_Type: " << recv_msg.getMessageTypeStr() << " source: " << recv_msg.m_source << " data: " << recv_msg.m_data << "\n";
         
-    }
+    // }
 
-    MPI_Barrier(MPI_COMM_WORLD);
     
+    MPI_Barrier(MPI_COMM_WORLD);
+    std::string test = "HERE " + std::to_string(rank) + "\n";
+    std::cout<< test;
     try 
     {
         node.startThreads();
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-        node.change();
+        // std::this_thread::sleep_for(std::chrono::seconds(3));
+        // node.change();
     } catch (...)
     {
         node.terminateThreads();
         throw;
     }
-    
     MPI_Barrier(MPI_COMM_WORLD);
+    node.terminateThreads();
+    
     MPI_Finalize();
     delete node_ptr;
     node_ptr = NULL;

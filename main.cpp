@@ -2,6 +2,7 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include <queue>
 #include "mpi.h"
 #include "stddef.h"
 
@@ -21,6 +22,11 @@ struct Message {
     Message(Message_Type type, int source, int data = 0) :  m_type(static_cast<int>(type)),
                                                             m_source(source),
                                                             m_data(data)
+    {
+    }
+    Message(int type, int source, int data = 0) :   m_type(type),
+                                                    m_source(source),
+                                                    m_data(data)
     {
     }
     Message() {}
@@ -68,6 +74,8 @@ class Node
         std::thread* m_recv_thread;
         std::thread* m_send_thread;
         std::thread* m_process_thread;
+        std::queue<Message> m_recv_queue;
+        std::queue<Message> m_send_queue;
     public:
         Node(){}
         Node(int rank): m_rank(rank) {}
@@ -86,17 +94,66 @@ class Node
         }
         ~Node()
         {
-            if(m_recv_thread->joinable()) {m_recv_thread->join();}
-            if(m_send_thread->joinable()) {m_send_thread->join();}
-            if(m_process_thread->joinable()) {m_process_thread->join();}
-            delete m_recv_thread;
-            delete m_send_thread;
-            delete m_process_thread;
-            m_recv_thread = NULL;
-            m_send_thread = NULL;
-            m_process_thread = NULL;
+            // if(m_recv_thread->joinable()) {m_recv_thread->join();}
+            // if(m_send_thread->joinable()) {m_send_thread->join();}
+            // if(m_process_thread->joinable()) {m_process_thread->join();}
+            
         }
         int getRank() const {return m_rank;}
+
+        bool startThreads()
+        {
+            if (!m_recv_thread)
+            {
+                m_recv_thread = new std::thread(&Node::Receive, this);
+            }
+            if (!m_send_thread)
+            {
+                m_send_thread = new std::thread(&Node::Send, this);
+            }
+            if (!m_process_thread)
+            {
+                m_process_thread = new std::thread(&Node::Process, this);
+            }
+        }
+        
+        void Receive()
+        {
+
+        }
+
+        void Send()
+        {
+
+        }
+
+        void Process()
+        {
+
+        }
+
+        void terminateThreads() 
+        {
+            if (m_recv_thread)
+            {
+                m_recv_thread->join();
+                delete m_recv_thread; 
+                m_recv_thread = NULL;
+            }
+            if (m_send_thread)
+            {
+                m_send_thread->join();
+                delete m_send_thread;
+                m_send_thread = NULL;
+            }
+            if (m_process_thread)
+            {
+                m_send_thread->join();
+                m_process_thread = NULL;
+                m_process_thread = NULL;
+            }
+
+        }
 
 };
 
@@ -181,7 +238,9 @@ int main(int argc, char * argv[])
                 flag=false;
             }
         }
-        std::cout << "Rank: " << node.getRank() << " Message_Type: " << recv_msg.getMessageTypeStr() << " source: " << recv_msg.m_source << " data: " << recv_msg.m_data << "\n";
+        //std::cout << "Rank: " << node.getRank() << " Message_Type: " << recv_msg.getMessageTypeStr() << " source: " << recv_msg.m_source << " data: " << recv_msg.m_data << "\n";
+        node.startThreads();
+        node.terminateThreads();
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

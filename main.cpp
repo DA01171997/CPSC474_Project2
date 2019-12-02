@@ -1,6 +1,39 @@
 #include <iostream>
-#include "mpi.h"
 #include <vector>
+#include <thread>
+#include <mutex>
+#include "mpi.h"
+#include "stddef.h"
+
+struct Message {
+    enum Message_Type {
+        End = 0,
+        WakeUp = 1,
+        Control = 2,
+        Announce = 3,
+    };
+    int m_id=0;
+    int m_type=0;
+    int m_data=0;
+    int m_source=0;
+    std::string getMessageType() const
+    {   
+        switch(m_type)
+        {
+            case 0:
+                return "End";
+            case 1:
+                return "WakeUp";
+            case 2:
+                return "Control";
+            case 3:
+                return "Announce";
+            default:
+                return "Invalid Type";
+        }
+    }
+};
+
 
 class Node 
 {
@@ -58,20 +91,37 @@ int main(int argc, char * argv[]) {
     int value = 0;
     Node& node = (*node_ptr);
     
-    
+    int struct_member_variable_counter = 4;
+    int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1,1};
+    MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT, MPI_INT};
+    MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] { offsetof(Message,m_id),offsetof(Message,m_type), offsetof(Message,m_data),offsetof(Message,m_source)};
+    MPI_Datatype message_struct;
+    MPI_Type_create_struct( struct_member_variable_counter, 
+                            struct_member_variable_block_lengths,
+                            struct_member_variable_displacement,
+                            struct_member_variable_type_array,
+                            &message_struct
+                            );
+    MPI_Type_commit(&message_struct);
+
+    Message wake_up_msg;
     if(node.getRank()==0){
         std::string command;
         bool flag = true;
         value =1;
         while (flag) 
         {
-            std::cin>>command;
+            std::cout << "Type \"start\" to start: ";
+            std::cin >> command;
             if (command=="start"){
-                MPI_Bcast(&value,1, MPI_INT,0, MPI_COMM_WORLD);
+                wake_up_msg.m_id = rank;
+                wake_up_msg.m_type = 1;
+                wake_up_msg.m_source = rank;
+                MPI_Bcast(&wake_up_msg,1, message_struct,0, MPI_COMM_WORLD);
                 flag=false;
             }
             else{
-                std::cout<<"Type start \n";
+                std::cout << "Type \"start\" to start"<< std::endl;
             }
         }   
     }
@@ -80,14 +130,17 @@ int main(int argc, char * argv[]) {
         bool flag = true;
         while (flag)
         {   
-            MPI_Bcast(&value,1, MPI_INT,0, MPI_COMM_WORLD);
-            if (value!=0){
+            MPI_Bcast(&wake_up_msg,1, message_struct,0, MPI_COMM_WORLD);
+            if (wake_up_msg.m_type!=0){
                 flag=false;
             }
         }
-        std::cout << "Rank " << node.getRank() << " value " << value << "\n";
+        std::cout << "Rank: " << node.getRank() << " Message_Type: " << wake_up_msg.getMessageType() << " source: " << wake_up_msg.m_source << "\n";
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
+    delete node_ptr;
+    node_ptr = NULL;
     return 0;
 }

@@ -2,6 +2,7 @@
 #include <vector>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include <queue>
 #include <chrono>
 #include "mpi.h"
@@ -79,6 +80,7 @@ class Node
         std::thread* m_send_thread;
         std::thread* m_process_thread;
         std::mutex m_mutex;
+        std::condition_variable m_condV;
     public:
         Node(){}
         Node(int rank): m_rank(rank) {}
@@ -102,7 +104,15 @@ class Node
 
         void change()
         {   
-            test =4;
+            if(m_rank==4)
+            {
+                std::cout<<"value before1 : " << test << "\n";
+                std::unique_lock<std::mutex> locker(m_mutex);
+                test =4;
+                 std::cout<<"value before2 : " << test << "\n";
+                m_condV.notify_one();
+            }
+
         }
         int getRank() const {return m_rank;}
 
@@ -110,9 +120,31 @@ class Node
         {
             if(m_rank==4)
             {
-                std::cout<<"value before : " << test << "\n";
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-                std::cout<<"value before : " << test << "\n";
+                bool flag = true;
+                int counter = 0;
+                // while (counter <2){
+                //     std::unique_lock<std::mutex> locker(m_mutex);
+                //     std::cout<<"value before : " << test << "\n";
+                //     std::this_thread::sleep_for(std::chrono::seconds(3));
+                //     counter++;
+                // }
+                std::cout<<"value after1 : " << test << "\n";
+                std::unique_lock<std::mutex> locker(m_mutex);
+                while (flag){
+                    m_condV.wait(locker);
+                    if (test!=0){
+                        std::cout<<"value after2 : " << test << "\n";
+                        flag = false;
+                    }
+                    
+                }
+                
+                
+                // while(test==0)
+                // {
+                    
+                // }
+                
             }
         }
 
@@ -246,7 +278,7 @@ int main(int argc, char * argv[])
                 flag=false;
             }
         }
-        std::cout << "Rank: " << node.getRank() << " Message_Type: " << recv_msg.getMessageTypeStr() << " source: " << recv_msg.m_source << " data: " << recv_msg.m_data << "\n";
+        // std::cout << "Rank: " << node.getRank() << " Message_Type: " << recv_msg.getMessageTypeStr() << " source: " << recv_msg.m_source << " data: " << recv_msg.m_data << "\n";
         
     }
 
@@ -255,7 +287,7 @@ int main(int argc, char * argv[])
     try 
     {
         node.startThreads();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::seconds(3));
         node.change();
     } catch (...)
     {

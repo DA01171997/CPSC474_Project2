@@ -125,6 +125,12 @@ class Node
         ~Node()
         {
             // terminateThreads();
+            delete m_recv_thread; 
+            m_recv_thread = NULL;
+            delete m_send_thread;
+            m_send_thread = NULL;
+            delete m_process_thread;
+            m_process_thread = NULL;
         }
 
         void change()
@@ -135,7 +141,7 @@ class Node
                 std::unique_lock<std::mutex> locker(m_mutex);
                 test =4;
                  std::cout<<"value before2 : " << test << "\n";
-                m_condV.notify_one();
+                m_conv_recv_q.notify_one();
             }
 
         }
@@ -167,7 +173,7 @@ class Node
             // } int
 
             int counter = 0;         
-            while((counter <2))
+            while((counter <10))
             {
                 try 
                 {   
@@ -176,15 +182,22 @@ class Node
                     MPI_Status status;
                     MPI_Probe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
                     MPI_Get_count(&status, MPI_INT, &amount);
-                    // std::cout<<"amount " << amount << " rank " << m_rank << "\n";
                     if (amount!=0)
                     {
                         MPI_Recv(&M,amount, message_struct, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                         // MPI_Recv(&blah,1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                        std::cout<< "value : " << M.m_data << " from: " << M.m_source << "\n";
+                        // std::cout<< "value : " << M.m_data << " from: " << M.m_source << "\n";
+                        {
+                            std::unique_lock<std::mutex> locker(m_mutex);
+                            std::cout<< "size before " << m_recv_queue.size() << " rank " << m_rank << "\n";
+                            m_recv_queue.push(M);
+                            std::cout<< "size after " << m_recv_queue.size() << " rank " << m_rank << "\n";
+                            m_conv_recv_q.notify_one();
+                            // std::cout<<"HERE " << m_rank << "\n";
+                        }
                     }
                     
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    std::this_thread::sleep_for(std::chrono::seconds(2));
                 } catch (...)
                 {
                     std::cout<< "In: error " << m_rank << "\n";
@@ -193,7 +206,7 @@ class Node
                 }
                 counter++;
             }
-            MPI_Barrier(MPI_COMM_WORLD);
+            // MPI_Barrier(MPI_COMM_WORLD);
         }
 
         void Send()
@@ -214,17 +227,24 @@ class Node
             }
             if (m_rank==4) 
             {
-                Message M (Message::WakeUp, m_rank, 10);
+                Message M (Message::WakeUp, m_rank, 11);
                 MPI_Send(&M,1, message_struct, 3, 0, MPI_COMM_WORLD);
                 // MPI_Send(&blah,1, MPI_INT, 2, 0, MPI_COMM_WORLD);
                 // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
             }
-            MPI_Barrier(MPI_COMM_WORLD);
+            if (m_rank==5) 
+            {
+                Message M (Message::WakeUp, m_rank, 12);
+                MPI_Send(&M,1, message_struct, 3, 0, MPI_COMM_WORLD);
+                // MPI_Send(&blah,1, MPI_INT, 2, 0, MPI_COMM_WORLD);
+                // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
+            }
+            // MPI_Barrier(MPI_COMM_WORLD);
         }
 
         void Process()
         {
-            MPI_Barrier(MPI_COMM_WORLD);
+            // MPI_Barrier(MPI_COMM_WORLD);
         }
         void startThreads()
         {
@@ -257,13 +277,8 @@ class Node
             {
                 m_process_thread->join();
             }
-            delete m_recv_thread; 
-            m_recv_thread = NULL;
-            delete m_send_thread;
-            m_send_thread = NULL;
-            delete m_process_thread;
-            m_process_thread = NULL;
-            MPI_Barrier(MPI_COMM_WORLD);
+            
+            // MPI_Barrier(MPI_COMM_WORLD);
         }
     private:
         int m_rank;
@@ -277,7 +292,7 @@ class Node
         std::thread* m_send_thread;
         std::thread* m_process_thread;
         std::mutex m_mutex;
-        std::condition_variable m_condV;
+        std::condition_variable m_conv_recv_q;
         MPI_Datatype message_struct;
         Message m_recv_msg; 
 };

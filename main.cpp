@@ -120,9 +120,9 @@ class Node
                     MPI_Get_count(&status, MPI_INT, &amount);
                     if (amount!=0)
                     {
-                        MPI_Recv(&M,amount, message_struct, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                        MPI_Recv(&M,amount, m_message_struct, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                         {
-                            std::unique_lock<std::mutex> locker(m_mutex);
+                            std::unique_lock<std::mutex> locker(m_mutex_recv_q);
                             m_recv_queue.push(M);
                             m_conv_recv_q.notify_one();
                         }
@@ -140,29 +140,42 @@ class Node
 
         void Send()
         {
-            if (m_rank==3) 
-            {
-                int destination = 4;
-                Message M (Message::WakeUp, m_rank, 9, destination);
-                MPI_Send(&M,1, message_struct, destination, 0, MPI_COMM_WORLD);
-            }
-            if (m_rank==4) 
-            {
-                int destination = 2;
-                Message M (Message::WakeUp, m_rank, 10, destination);
-                MPI_Send(&M,1, message_struct, destination, 0, MPI_COMM_WORLD);
-            }
-            if (m_rank==4) 
-            {
-                int destination = 3;
-                Message M (Message::WakeUp, m_rank, 11, destination);
-                MPI_Send(&M,1, message_struct, destination, 0, MPI_COMM_WORLD);
-            }
-            if (m_rank==5) 
-            {
-                int destination = 3;
-                Message M (Message::WakeUp, m_rank, 12, destination = 3);
-                MPI_Send(&M,1, message_struct, destination, 0, MPI_COMM_WORLD);
+            // if (m_rank==3) 
+            // {
+            //     int destination = 4;
+            //     Message M (Message::WakeUp, m_rank, 9, destination);
+            //     MPI_Send(&M,1, m_message_struct, destination, 0, MPI_COMM_WORLD);
+            // }
+            // if (m_rank==4) 
+            // {
+            //     int destination = 2;
+            //     Message M (Message::WakeUp, m_rank, 10, destination);
+            //     MPI_Send(&M,1, m_message_struct, destination, 0, MPI_COMM_WORLD);
+            // }
+            // if (m_rank==4) 
+            // {
+            //     int destination = 3;
+            //     Message M (Message::WakeUp, m_rank, 11, destination);
+            //     MPI_Send(&M,1, m_message_struct, destination, 0, MPI_COMM_WORLD);
+            // }
+            // if (m_rank==5) 
+            // {
+            //     int destination = 3;
+            //     Message M (Message::WakeUp, m_rank, 12, destination = 3);
+            //     MPI_Send(&M,1, m_message_struct, destination, 0, MPI_COMM_WORLD);
+            // }
+            bool flag = true;
+            while(flag){
+                Message M;
+                {
+                    std::unique_lock<std::mutex> locker(m_mutex_send_q);
+                    while(m_send_queue.empty())
+                    {
+                        m_conv_send_q.wait(locker);
+                    }
+                    M = m_send_queue.front();
+                    m_send_queue.pop();
+                }
             }
         }
 
@@ -173,7 +186,7 @@ class Node
             {
                 Message M;
                 {
-                    std::unique_lock<std::mutex> locker(m_mutex);
+                    std::unique_lock<std::mutex> locker(m_mutex_recv_q);
                     while(m_recv_queue.empty())
                     {
                         m_conv_recv_q.wait(locker);
@@ -238,7 +251,6 @@ class Node
         }
     private:
         int m_rank;
-        int test =0;
         std::string m_name="";
         std::vector<int> m_neighbore;
         std::vector<int> m_buffer;
@@ -247,9 +259,11 @@ class Node
         std::thread* m_recv_thread;
         std::thread* m_send_thread;
         std::thread* m_process_thread;
-        std::mutex m_mutex;
+        std::mutex m_mutex_recv_q;
+        std::mutex m_mutex_send_q;
         std::condition_variable m_conv_recv_q;
-        MPI_Datatype message_struct;
+        std::condition_variable m_conv_send_q;
+        MPI_Datatype m_message_struct;
         Message m_recv_msg; 
         void createMessageStruct()
         {   
@@ -264,9 +278,9 @@ class Node
                                 struct_member_variable_block_lengths,
                                 struct_member_variable_displacement,
                                 struct_member_variable_type_array,
-                                &message_struct
+                                &m_message_struct
                                 );
-            MPI_Type_commit(&message_struct);
+            MPI_Type_commit(&m_message_struct);
         }
 };
 
@@ -284,6 +298,7 @@ int main(int argc, char * argv[])
         return 1;
     }
     // Initialize the topology of each process base on rank
+    std::vector<int> neighbore0 {1,2,3,4,5,6};
     std::vector<int> neighbore1 {4};
     std::vector<int> neighbore2 {3,4,5};
     std::vector<int> neighbore3 {2};
@@ -292,7 +307,7 @@ int main(int argc, char * argv[])
     std::vector<int> neighbore6 {4};
 
     Node* node_ptr;
-    if(rank==0) {node_ptr = new Node(rank);}
+    if(rank==0) {node_ptr = new Node(rank, "o", neighbore0);}
     if(rank==1) {node_ptr = new Node(rank, "q", neighbore1);}
     if(rank==2) {node_ptr = new Node(rank, "s", neighbore2);}
     if(rank==3) {node_ptr = new Node(rank, "t", neighbore3);}
@@ -313,7 +328,7 @@ int main(int argc, char * argv[])
     //         if (command=="start")
     //         {
     //             Message wake_up_msg(Message::WakeUp, rank, 9);
-    //             MPI_Bcast(&wake_up_msg,1, message_struct,0, MPI_COMM_WORLD);
+    //             MPI_Bcast(&wake_up_msg,1, m_message_struct,0, MPI_COMM_WORLD);
     //             flag=false;
     //         }
     //         else
@@ -330,7 +345,7 @@ int main(int argc, char * argv[])
     //     Message recv_msg;
     //     while (flag)
     //     {   
-    //         MPI_Bcast(&recv_msg,1, message_struct,0, MPI_COMM_WORLD);
+    //         MPI_Bcast(&recv_msg,1, m_message_struct,0, MPI_COMM_WORLD);
     //         if (recv_msg.getMessageType() == Message::Message_Type::WakeUp)
     //         {
     //             flag=false;

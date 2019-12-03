@@ -166,9 +166,7 @@ class Node
             
             // } int
 
-            int counter = 0;
-            // if (m_rank==2) {
-                      
+            int counter = 0;         
             while((counter <2))
             {
                 try 
@@ -196,8 +194,6 @@ class Node
                 counter++;
             }
             MPI_Barrier(MPI_COMM_WORLD);
-            // }  
-            
         }
 
         void Send()
@@ -223,10 +219,12 @@ class Node
                 // MPI_Send(&blah,1, MPI_INT, 2, 0, MPI_COMM_WORLD);
                 // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
             }
+            MPI_Barrier(MPI_COMM_WORLD);
         }
 
         void Process()
         {
+            MPI_Barrier(MPI_COMM_WORLD);
         }
         void startThreads()
         {

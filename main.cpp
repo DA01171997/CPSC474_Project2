@@ -89,7 +89,6 @@ class Node
             m_biggest_rank = m_rank;
             createMessageStruct();
             setupNeighboreMap();
-            m_buffer.reserve(m_neighbore.size());
         }
         ~Node()
         {
@@ -109,9 +108,7 @@ class Node
             int counter = 0;
             bool flag = true;         
             while(flag)
-            {
-                // try 
-                // {   
+            {  
                 int amount;
                 Message M;  
                 MPI_Status status;
@@ -126,35 +123,7 @@ class Node
                         m_conv_recv_q.notify_one();
                     }
                 }
-                // std::string s ="Node::Receive: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
-                // std::string s = "Node::Process: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
-                // if (M.getMessageType()!=Message::Message_Type::WakeUp){
-                //     std::cout<<s;
-                // }
-                switch(M.getMessageType()){
-                    case Message::Message_Type::End:
-                        {
-                        // flag = false;
-                        break;
-                        }  
-                    case Message::Message_Type::WakeUp:
-                        {
-                        break;
-                        }
-                    case Message::Message_Type::Control:
-                        break;
-                    case Message::Message_Type::Announce:
-                        break;
-                    default:
-                        break;
-                }
-                std::this_thread::sleep_for(std::chrono::seconds(2));
-                // } catch (...)
-                // {
-                //     std::cout<< "In: error " << m_rank << "\n";
-                //     throw;
-                // }
-                // counter++;
+                std::this_thread::sleep_for(std::chrono::seconds(1));
             }
         }
 
@@ -173,25 +142,6 @@ class Node
                     m_send_queue.pop();
                 }
                 MPI_Send(&M,1, m_message_struct, M.m_destination, 0, MPI_COMM_WORLD);
-                // std::string s ="Node::Send: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
-                // std::cout<<s;
-                switch(M.getMessageType()){
-                    case Message::Message_Type::End:
-                        {
-                        // flag = false;
-                        break;
-                        }  
-                    case Message::Message_Type::WakeUp:
-                        {
-                        break;
-                        }
-                    case Message::Message_Type::Control:
-                        break;
-                    case Message::Message_Type::Announce:
-                        break;
-                    default:
-                        break;
-                }
             }
         }
 
@@ -211,28 +161,31 @@ class Node
                     M = m_recv_queue.front();
                     m_recv_queue.pop();
                 }
-                std::string s = "Node::Process: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
-                if (M.getMessageType()!=Message::Message_Type::WakeUp){
-                    std::cout<<s;
-                }
+                std::string s = "Node::Process: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + " data: " + std::to_string(M.m_data) + "\n";
+                std::cout<<s;
                 switch(M.getMessageType()){
                     case Message::Message_Type::End:
                         {
                         // flag = false;
                         break;
                         }
+
+                    // Trigger flag2 which will trigger the election
                     case Message::Message_Type::WakeUp:
                         {
                         flag2 = true;
                         break;
                         }
+
+                    // Calculate the biggest data from Control message.
+                    // If it receive Control message from it parent,
+                    // it will decide and send Announce message to 
+                    // all its neighbore except the parent. 
                     case Message::Message_Type::Control:
                         {
-                            // std::cout << "rank " << std::to_string(m_rank) << " size: " << std::to_string(m_neighbore_map.size()) << " source: " << std::to_string(M.m_source) << " data: " << std::to_string(M.m_data)<< "\n";
                             updateBiggest(M.m_data);
                             m_neighbore_map.erase(M.m_source);
                             if (M.m_source==m_parent_rank){
-                                std::cout << "rank " << std::to_string(m_rank) << " size: " << std::to_string(m_neighbore_map.size()) << " source: " << std::to_string(m_parent_rank) << " data: " << std::to_string(m_biggest_rank)<< "\n";
                                 for (int i = 0; i<m_neighbore.size(); i++)
                                 {
                                     if(m_neighbore[i]!=m_parent_rank)
@@ -240,22 +193,25 @@ class Node
                                         Message M2(Message::Message_Type::Announce, m_rank, m_biggest_rank,m_neighbore[i]);
                                         addMessageToSendQueue(M2);
                                     }
-                                }
-                                
+                                }       
                             }
-
                         }
                         break;
+                    
+                    // Elect itself it is receive an Announce message with data == rank
                     case Message::Message_Type::Announce:
                         if (M.m_data==m_rank)
                         {
-                            s = "************Node: " + m_name + " rank: " + std::to_string(m_rank) + " .I am elected!************\n";
+                            s = "Node::Process: " + m_name + " rank: " + std::to_string(m_rank) + " *************I am elected!*************\n";
                             std::cout<<s;
                         }
                         break;
                     default:
                         break;
                 }
+
+                // Wait until it has received message from all neighbore except one,
+                // make it the parent, then send message to it.
                 if (flag2)
                 {
                     
@@ -263,19 +219,22 @@ class Node
                     {
                         std::map<int,int>::iterator it = m_neighbore_map.begin();
                         m_parent_rank = it->first;
-                        // std::cout << "rank " << std::to_string(m_rank) << " size: " << std::to_string(m_neighbore_map.size()) << " parent: " << std::to_string(it->first) << "\n";
                         Message M2 (Message::Message_Type::Control, m_rank, m_biggest_rank,m_parent_rank);
                         addMessageToSendQueue(M2);
                     }
                 }
             }
         }
+
+        // Use to add message to the send thread with already constructed Message
         void addMessageToSendQueue(const Message& M) 
         {
             std::unique_lock<std::mutex> locker(m_mutex_send_q);
             m_send_queue.push(M);
             m_conv_send_q.notify_one();
         }
+
+        // Use to add message to the send thread 
         void addMessageToSendQueue(int type, int source, int data = 0, int destination = 0)
         {
             Message M(type, source, data, destination);
@@ -283,6 +242,8 @@ class Node
             m_send_queue.push(M);
             m_conv_send_q.notify_one();
         }
+
+        // Use to spawn the threads
         void startThreads()
         {
             
@@ -299,6 +260,8 @@ class Node
                 m_process_thread = new std::thread(&Node::Process, this);
             }
         }
+
+        // Use to joins all threads
         void terminateThreads() 
         {
             if ((m_recv_thread)&&(m_recv_thread->joinable()))
@@ -314,14 +277,11 @@ class Node
                 m_process_thread->join();
             }
         }
+
+        // Use by process 0 to start a wakeup sequence
         void startElection(){
             for(int i = 0; i < m_neighbore.size(); i++){
-                addMessageToSendQueue(1, m_rank, 11, m_neighbore[i]);
-            }
-        }
-        void SendEnd(){
-            for(int i = 0; i < m_neighbore.size(); i++){
-                addMessageToSendQueue(0, m_rank, 11, m_neighbore[i]);
+                addMessageToSendQueue(1, m_rank, 0, m_neighbore[i]);
             }
         }
     private:
@@ -330,7 +290,6 @@ class Node
         int m_biggest_rank;
         std::string m_name="";
         std::vector<int> m_neighbore;
-        std::vector<int> m_buffer;
         std::map<int,int> m_neighbore_map;
         std::queue<Message> m_recv_queue;
         std::queue<Message> m_send_queue;
@@ -342,7 +301,8 @@ class Node
         std::condition_variable m_conv_recv_q;
         std::condition_variable m_conv_send_q;
         MPI_Datatype m_message_struct;
-        Message m_recv_msg; 
+
+        // Create a Message struct for MPI to send 
         void createMessageStruct()
         {   
             int struct_member_variable_counter = 4;
@@ -360,6 +320,8 @@ class Node
                                 );
             MPI_Type_commit(&m_message_struct);
         }
+
+        // Make a map of all neighbore for election process
         void setupNeighboreMap()
         {
             for(int i =0; i<m_neighbore.size(); i++)
@@ -367,6 +329,8 @@ class Node
                 m_neighbore_map.insert(std::make_pair(m_neighbore[i],m_neighbore[i]));
             }
         }
+
+        // Use to check for the highest ID
         void updateBiggest(int num){
             m_biggest_rank = (m_biggest_rank > num) ? m_biggest_rank : num;
         }
@@ -385,6 +349,7 @@ int main(int argc, char * argv[])
         std::cout<<"Error: Need to run program with 7 processes \n";
         return 1;
     }
+
     // Initialize the topology of each process base on rank
     std::vector<int> neighbore0 {1,2,3,4,5,6};
     std::vector<int> neighbore1 {4};
@@ -404,30 +369,32 @@ int main(int argc, char * argv[])
     if(rank==6) {node_ptr = new Node(rank, "p", neighbore6);}
     Node& node = (*node_ptr);
 
+    // Synchronize all process to make sure all got initialize correctly
     MPI_Barrier(MPI_COMM_WORLD);
+    
+    // Try to start election process with process 0
     try 
     {
+        // Spawn receive, send, process threads for all processes.
         node.startThreads();
+
+        // Process 0 start the election sequence
         if (rank==0){
             node.startElection();
             std::this_thread::sleep_for(std::chrono::seconds(1));
             // node.SendEnd();
         }
-        // std::this_thread::sleep_for(std::chrono::seconds(3));
-        // node.change();
     } catch (...)
     {
-        std::cout<< "Out: error " << rank << "\n";
-        // MPI_Barrier(MPI_COMM_WORLD);
+        std::cout<< "Error " << rank << "\n";
         node.terminateThreads();
-        // MPI_Barrier(MPI_COMM_WORLD);
         throw;
     }
 
+    // Clean up 
     node.terminateThreads();
     MPI_Finalize();
     delete node_ptr;
     node_ptr = NULL;
-    
     return 0;
 }

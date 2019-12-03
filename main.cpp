@@ -140,30 +140,6 @@ class Node
 
         void Send()
         {
-            // if (m_rank==3) 
-            // {
-            //     int destination = 4;
-            //     Message M (Message::WakeUp, m_rank, 9, destination);
-            //     MPI_Send(&M,1, m_message_struct, destination, 0, MPI_COMM_WORLD);
-            // }
-            // if (m_rank==4) 
-            // {
-            //     int destination = 2;
-            //     Message M (Message::WakeUp, m_rank, 10, destination);
-            //     MPI_Send(&M,1, m_message_struct, destination, 0, MPI_COMM_WORLD);
-            // }
-            // if (m_rank==4) 
-            // {
-            //     int destination = 3;
-            //     Message M (Message::WakeUp, m_rank, 11, destination);
-            //     MPI_Send(&M,1, m_message_struct, destination, 0, MPI_COMM_WORLD);
-            // }
-            // if (m_rank==5) 
-            // {
-            //     int destination = 3;
-            //     Message M (Message::WakeUp, m_rank, 12, destination = 3);
-            //     MPI_Send(&M,1, m_message_struct, destination, 0, MPI_COMM_WORLD);
-            // }
             bool flag = true;
             while(flag){
                 Message M;
@@ -176,6 +152,7 @@ class Node
                     M = m_send_queue.front();
                     m_send_queue.pop();
                 }
+                MPI_Send(&M,1, m_message_struct, M.m_destination, 0, MPI_COMM_WORLD);
             }
         }
 
@@ -217,6 +194,19 @@ class Node
                 
             }
         }
+        void addMessageToSendQueue(const Message& M) 
+        {
+            std::unique_lock<std::mutex> locker(m_mutex_send_q);
+            m_send_queue.push(M);
+            m_conv_send_q.notify_one();
+        }
+        void addMessageToSendQueue(int type, int source, int data = 0, int destination = 0)
+        {
+            Message M(type, source, data, destination);
+            std::unique_lock<std::mutex> locker(m_mutex_send_q);
+            m_send_queue.push(M);
+            m_conv_send_q.notify_one();
+        }
         void startThreads()
         {
             
@@ -247,6 +237,11 @@ class Node
             if ((m_process_thread)&&(m_process_thread->joinable()))
             {
                 m_process_thread->join();
+            }
+        }
+        void startElection(){
+            for(int i = 0; i < m_neighbore.size(); i++){
+                addMessageToSendQueue(1, m_rank, 11, m_neighbore[i]);
             }
         }
     private:
@@ -316,50 +311,16 @@ int main(int argc, char * argv[])
     if(rank==6) {node_ptr = new Node(rank, "p", neighbore6);}
     Node& node = (*node_ptr);
 
-    // Node's rank == 0 starts the Wakeup Process when user entered "start".
-    // if(node.getRank()==0)
-    // {
-    //     std::string command;
-    //     bool flag = true;
-    //     while (flag) 
-    //     {
-    //         std::cout << "Type \"start\" to start: ";
-    //         std::cin >> command;
-    //         if (command=="start")
-    //         {
-    //             Message wake_up_msg(Message::WakeUp, rank, 9);
-    //             MPI_Bcast(&wake_up_msg,1, m_message_struct,0, MPI_COMM_WORLD);
-    //             flag=false;
-    //         }
-    //         else
-    //         {
-    //             std::cout << "Type \"start\" to start"<< std::endl;
-    //         }
-    //     }   
-    // }
-
-    // // Node's rank !=0 will wait for the WakeUp message.
-    // if((node.getRank()!=0))
-    // {
-    //     bool flag = true;
-    //     Message recv_msg;
-    //     while (flag)
-    //     {   
-    //         MPI_Bcast(&recv_msg,1, m_message_struct,0, MPI_COMM_WORLD);
-    //         if (recv_msg.getMessageType() == Message::Message_Type::WakeUp)
-    //         {
-    //             flag=false;
-    //         }
-    //     }
-    //     // std::cout << "Rank: " << node.getRank() << " Message_Type: " << recv_msg.getMessageTypeStr() << " source: " << recv_msg.m_source << " data: " << recv_msg.m_data << "\n";
-        
-    // }
-
-    
     MPI_Barrier(MPI_COMM_WORLD);
     try 
     {
         node.startThreads();
+        if (rank==0){
+            // int destination = 3;
+            // // Message M(Message::WakeUp, rank, 11, destination);
+            // node.addMessageToSendQueue(1, rank, 11, destination);
+            node.startElection();
+        }
         // std::this_thread::sleep_for(std::chrono::seconds(3));
         // node.change();
     } catch (...)

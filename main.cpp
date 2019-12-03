@@ -13,6 +13,8 @@ class Node
 {       
     public:
         struct Message {
+
+            // Message type.
             enum Message_Type {
                 End = 0,
                 WakeUp = 1,
@@ -25,18 +27,23 @@ class Node
             int m_source=0;
             int m_destination=0;
 
+            // Message Constructor.
             Message(Message_Type type, int source, int data = 0, int destination = 0) : m_type(static_cast<int>(type)), 
                                                                                         m_source(source), 
                                                                                         m_data(data),
                                                                                         m_destination(destination)
             {
             }
+
+            // Message Constructor.
             Message(int type, int source, int data = 0, int destination = 0) :  m_type(type),
                                                                                 m_source(source),
                                                                                 m_data(data),
                                                                                 m_destination(destination)
             {
             }
+
+            // Return string Message type.
             Message() {}
             std::string getMessageTypeStr() const
             {   
@@ -54,6 +61,8 @@ class Node
                         return "Invalid Type";
                 }
             }
+
+            // Return Message type.
             Message_Type getMessageType() const
             {   
                 switch(m_type)
@@ -72,16 +81,21 @@ class Node
             }
         };
 
+        // Default Node constructer. 
         Node()
         {
             createMessageStruct();
             setupNeighboreMap();    
         }
+
+        // Node constructer. 
         Node(int rank): m_rank(rank) {
             m_biggest_rank = m_rank;
             createMessageStruct();
             setupNeighboreMap();
         }
+
+        // Node constructer.
         Node(int rank, const std::string& name, const std::vector<int>& neighbore): m_rank(rank), 
                                                                                     m_name(name), 
                                                                                     m_neighbore(neighbore)
@@ -90,6 +104,8 @@ class Node
             createMessageStruct();
             setupNeighboreMap();
         }
+
+        // Clean up pointers.
         ~Node()
         {
             delete m_recv_thread; 
@@ -100,7 +116,7 @@ class Node
             m_process_thread = NULL;
         }
 
-        
+        // Return Node rank.
         int getRank() const {return m_rank;}
 
         void Receive()
@@ -109,6 +125,8 @@ class Node
             bool flag = true;         
             while(flag)
             {  
+                // Prob to see if there are any messages to receive,
+                // if amount !=0 mean there are message, the receive.
                 int amount;
                 Message M;  
                 MPI_Status status;
@@ -116,6 +134,10 @@ class Node
                 MPI_Get_count(&status, MPI_INT, &amount);
                 if (amount!=0)
                 {
+
+                    // Aquire locker to push messages to the recv queue,
+                    // notify conditional variable that a new message
+                    // has been added.
                     MPI_Recv(&M,amount, m_message_struct, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                     {
                         std::unique_lock<std::mutex> locker(m_mutex_recv_q);
@@ -131,6 +153,9 @@ class Node
         {
             bool flag = true;
             while(flag){
+
+                // Wait till condition variable trigger to relock the send queue
+                // in order to pop off message for sending.
                 Message M;
                 {
                     std::unique_lock<std::mutex> locker(m_mutex_send_q);
@@ -141,6 +166,8 @@ class Node
                     M = m_send_queue.front();
                     m_send_queue.pop();
                 }
+
+                // Send Message 
                 MPI_Send(&M,1, m_message_struct, M.m_destination, 0, MPI_COMM_WORLD);
             }
         }
@@ -151,6 +178,8 @@ class Node
             bool flag2 = false;
             while(flag)
             {
+                // Wait till condition variable trigger to relock the recv queue
+                // in order to pop off message for processing.
                 Message M;
                 {
                     std::unique_lock<std::mutex> locker(m_mutex_recv_q);
@@ -163,14 +192,18 @@ class Node
                 }
                 std::string s = "Node::Process: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + " data: " + std::to_string(M.m_data) + "\n";
                 std::cout<<s;
+
+                // Process the message.
                 switch(M.getMessageType()){
+                    
+                    // Intented to exit thread; (doesn't work atm).
                     case Message::Message_Type::End:
                         {
                         // flag = false;
                         break;
                         }
 
-                    // Trigger flag2 which will trigger the election
+                    // Trigger flag2 which will trigger the election.
                     case Message::Message_Type::WakeUp:
                         {
                         flag2 = true;
@@ -198,7 +231,7 @@ class Node
                         }
                         break;
                     
-                    // Elect itself it is receive an Announce message with data == rank
+                    // Elect itself it is receive an Announce message with data == rank.
                     case Message::Message_Type::Announce:
                         if (M.m_data==m_rank)
                         {
@@ -226,7 +259,7 @@ class Node
             }
         }
 
-        // Use to add message to the send thread with already constructed Message
+        // Use to add message to the send thread with already constructed Message.
         void addMessageToSendQueue(const Message& M) 
         {
             std::unique_lock<std::mutex> locker(m_mutex_send_q);
@@ -234,7 +267,7 @@ class Node
             m_conv_send_q.notify_one();
         }
 
-        // Use to add message to the send thread 
+        // Use to add message to the send thread.
         void addMessageToSendQueue(int type, int source, int data = 0, int destination = 0)
         {
             Message M(type, source, data, destination);
@@ -243,7 +276,7 @@ class Node
             m_conv_send_q.notify_one();
         }
 
-        // Use to spawn the threads
+        // Use to spawn the threads.
         void startThreads()
         {
             
@@ -261,7 +294,7 @@ class Node
             }
         }
 
-        // Use to joins all threads
+        // Use to joins all threads.
         void terminateThreads() 
         {
             if ((m_recv_thread)&&(m_recv_thread->joinable()))
@@ -278,7 +311,7 @@ class Node
             }
         }
 
-        // Use by process 0 to start a wakeup sequence
+        // Use by process 0 to start a wakeup sequence.
         void startElection(){
             for(int i = 0; i < m_neighbore.size(); i++){
                 addMessageToSendQueue(1, m_rank, 0, m_neighbore[i]);
@@ -302,7 +335,7 @@ class Node
         std::condition_variable m_conv_send_q;
         MPI_Datatype m_message_struct;
 
-        // Create a Message struct for MPI to send 
+        // Create a Message struct for MPI to send.
         void createMessageStruct()
         {   
             int struct_member_variable_counter = 4;
@@ -321,7 +354,7 @@ class Node
             MPI_Type_commit(&m_message_struct);
         }
 
-        // Make a map of all neighbore for election process
+        // Make a map of all neighbore for election process.
         void setupNeighboreMap()
         {
             for(int i =0; i<m_neighbore.size(); i++)
@@ -330,7 +363,7 @@ class Node
             }
         }
 
-        // Use to check for the highest ID
+        // Use to check for the highest ID.
         void updateBiggest(int num){
             m_biggest_rank = (m_biggest_rank > num) ? m_biggest_rank : num;
         }
@@ -350,7 +383,7 @@ int main(int argc, char * argv[])
         return 1;
     }
 
-    // Initialize the topology of each process base on rank
+    // Initialize the topology of each process base on rank.
     std::vector<int> neighbore0 {1,2,3,4,5,6};
     std::vector<int> neighbore1 {4};
     std::vector<int> neighbore2 {3,4,5};
@@ -369,16 +402,16 @@ int main(int argc, char * argv[])
     if(rank==6) {node_ptr = new Node(rank, "p", neighbore6);}
     Node& node = (*node_ptr);
 
-    // Synchronize all process to make sure all got initialize correctly
+    // Synchronize all process to make sure all got initialize correctly.
     MPI_Barrier(MPI_COMM_WORLD);
     
-    // Try to start election process with process 0
+    // Try to start election process with process 0.
     try 
     {
         // Spawn receive, send, process threads for all processes.
         node.startThreads();
 
-        // Process 0 start the election sequence
+        // Process 0 start the election sequence.
         if (rank==0){
             node.startElection();
             std::this_thread::sleep_for(std::chrono::seconds(1));

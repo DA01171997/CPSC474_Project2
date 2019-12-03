@@ -189,9 +189,9 @@ class Node
                         // std::cout<< "value : " << M.m_data << " from: " << M.m_source << "\n";
                         {
                             std::unique_lock<std::mutex> locker(m_mutex);
-                            std::cout<< "size before " << m_recv_queue.size() << " rank " << m_rank << "\n";
+                            // std::cout<< "size before " << m_recv_queue.size() << " rank " << m_rank << "\n";
                             m_recv_queue.push(M);
-                            std::cout<< "size after " << m_recv_queue.size() << " rank " << m_rank << "\n";
+                            // std::cout<< "size after " << m_recv_queue.size() << " rank " << m_rank << "\n";
                             m_conv_recv_q.notify_one();
                             // std::cout<<"HERE " << m_rank << "\n";
                         }
@@ -240,11 +240,34 @@ class Node
                 // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
             }
             // MPI_Barrier(MPI_COMM_WORLD);
+            // bool flag = true; 
+            // while (flag)
+            // {
+                
+            // }
         }
 
         void Process()
         {
-            // MPI_Barrier(MPI_COMM_WORLD);
+            bool flag = true;
+            while(flag)
+            {
+                Message M;
+                {
+                    std::unique_lock<std::mutex> locker(m_mutex);
+                    while(m_recv_queue.empty())
+                    {
+                        m_conv_recv_q.wait(locker);
+                    }
+                    // std::string tempM= "I got one " + std::to_string(m_rank) + "\n";
+                    // std::cout <<tempM;
+
+                    M = m_recv_queue.front();
+                    m_recv_queue.pop();
+                }
+                // std::cout<< "value : " << M.m_data << " from: " << M.m_source << "\n";
+                
+            }
         }
         void startThreads()
         {

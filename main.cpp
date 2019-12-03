@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <map>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -73,24 +74,22 @@ class Node
 
         Node()
         {
-            createMessageStruct();    
+            createMessageStruct();
+            setupNeighboreMap();    
         }
         Node(int rank): m_rank(rank) {
+            m_biggest_rank = m_rank;
             createMessageStruct();
+            setupNeighboreMap();
         }
         Node(int rank, const std::string& name, const std::vector<int>& neighbore): m_rank(rank), 
                                                                                     m_name(name), 
                                                                                     m_neighbore(neighbore)
         {
+            m_biggest_rank = m_rank;
             createMessageStruct();
+            setupNeighboreMap();
             m_buffer.reserve(m_neighbore.size());
-            std::string validate_message = "Node: " + m_name + ", rank: " + std::to_string(m_rank) + ", neighbore: ";
-            for(int i=0; i<m_neighbore.size(); i++)
-            {
-                validate_message += std::to_string(m_neighbore[i]) + " ";
-            }
-            validate_message += "\n";
-            // std::cout << validate_message;
         }
         ~Node()
         {
@@ -127,8 +126,11 @@ class Node
                         m_conv_recv_q.notify_one();
                     }
                 }
-                std::string s ="Node::Receive: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
-                std::cout<<s;
+                // std::string s ="Node::Receive: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
+                // std::string s = "Node::Process: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
+                // if (M.getMessageType()!=Message::Message_Type::WakeUp){
+                //     std::cout<<s;
+                // }
                 switch(M.getMessageType()){
                     case Message::Message_Type::End:
                         {
@@ -171,8 +173,8 @@ class Node
                     m_send_queue.pop();
                 }
                 MPI_Send(&M,1, m_message_struct, M.m_destination, 0, MPI_COMM_WORLD);
-                std::string s ="Node::Send: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
-                std::cout<<s;
+                // std::string s ="Node::Send: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
+                // std::cout<<s;
                 switch(M.getMessageType()){
                     case Message::Message_Type::End:
                         {
@@ -196,6 +198,7 @@ class Node
         void Process()
         {
             bool flag = true;
+            bool flag2 = false;
             while(flag)
             {
                 Message M;
@@ -209,7 +212,9 @@ class Node
                     m_recv_queue.pop();
                 }
                 std::string s = "Node::Process: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
-                std::cout<<s;
+                if (M.getMessageType()!=Message::Message_Type::WakeUp){
+                    std::cout<<s;
+                }
                 switch(M.getMessageType()){
                     case Message::Message_Type::End:
                         {
@@ -218,16 +223,51 @@ class Node
                         }
                     case Message::Message_Type::WakeUp:
                         {
+                        flag2 = true;
                         break;
                         }
                     case Message::Message_Type::Control:
+                        {
+                            // std::cout << "rank " << std::to_string(m_rank) << " size: " << std::to_string(m_neighbore_map.size()) << " source: " << std::to_string(M.m_source) << " data: " << std::to_string(M.m_data)<< "\n";
+                            updateBiggest(M.m_data);
+                            m_neighbore_map.erase(M.m_source);
+                            if (M.m_source==m_parent_rank){
+                                std::cout << "rank " << std::to_string(m_rank) << " size: " << std::to_string(m_neighbore_map.size()) << " source: " << std::to_string(m_parent_rank) << " data: " << std::to_string(m_biggest_rank)<< "\n";
+                                for (int i = 0; i<m_neighbore.size(); i++)
+                                {
+                                    if(m_neighbore[i]!=m_parent_rank)
+                                    {
+                                        Message M2(Message::Message_Type::Announce, m_rank, m_biggest_rank,m_neighbore[i]);
+                                        addMessageToSendQueue(M2);
+                                    }
+                                }
+                                
+                            }
+
+                        }
                         break;
                     case Message::Message_Type::Announce:
+                        if (M.m_data==m_rank)
+                        {
+                            s = "************Node: " + m_name + " rank: " + std::to_string(m_rank) + " .I am elected!************\n";
+                            std::cout<<s;
+                        }
                         break;
                     default:
                         break;
                 }
-                
+                if (flag2)
+                {
+                    
+                    if(m_neighbore_map.size()==1)
+                    {
+                        std::map<int,int>::iterator it = m_neighbore_map.begin();
+                        m_parent_rank = it->first;
+                        // std::cout << "rank " << std::to_string(m_rank) << " size: " << std::to_string(m_neighbore_map.size()) << " parent: " << std::to_string(it->first) << "\n";
+                        Message M2 (Message::Message_Type::Control, m_rank, m_biggest_rank,m_parent_rank);
+                        addMessageToSendQueue(M2);
+                    }
+                }
             }
         }
         void addMessageToSendQueue(const Message& M) 
@@ -259,7 +299,6 @@ class Node
                 m_process_thread = new std::thread(&Node::Process, this);
             }
         }
-
         void terminateThreads() 
         {
             if ((m_recv_thread)&&(m_recv_thread->joinable()))
@@ -287,9 +326,12 @@ class Node
         }
     private:
         int m_rank;
+        int m_parent_rank;
+        int m_biggest_rank;
         std::string m_name="";
         std::vector<int> m_neighbore;
         std::vector<int> m_buffer;
+        std::map<int,int> m_neighbore_map;
         std::queue<Message> m_recv_queue;
         std::queue<Message> m_send_queue;
         std::thread* m_recv_thread;
@@ -317,6 +359,16 @@ class Node
                                 &m_message_struct
                                 );
             MPI_Type_commit(&m_message_struct);
+        }
+        void setupNeighboreMap()
+        {
+            for(int i =0; i<m_neighbore.size(); i++)
+            {
+                m_neighbore_map.insert(std::make_pair(m_neighbore[i],m_neighbore[i]));
+            }
+        }
+        void updateBiggest(int num){
+            m_biggest_rank = (m_biggest_rank > num) ? m_biggest_rank : num;
         }
 };
 
@@ -359,7 +411,7 @@ int main(int argc, char * argv[])
         if (rank==0){
             node.startElection();
             std::this_thread::sleep_for(std::chrono::seconds(1));
-            node.SendEnd();
+            // node.SendEnd();
         }
         // std::this_thread::sleep_for(std::chrono::seconds(3));
         // node.change();

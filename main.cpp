@@ -8,7 +8,6 @@
 #include "mpi.h"
 #include "stddef.h"
 
-
 class Node 
 {       
     public:
@@ -108,33 +107,52 @@ class Node
 
         void Receive()
         {
-            int counter = 0;         
-            while((counter <10))
+            int counter = 0;
+            bool flag = true;         
+            while(flag)
             {
-                try 
-                {   
-                    int amount;
-                    Message M;  
-                    MPI_Status status;
-                    MPI_Probe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
-                    MPI_Get_count(&status, MPI_INT, &amount);
-                    if (amount!=0)
-                    {
-                        MPI_Recv(&M,amount, m_message_struct, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                        {
-                            std::unique_lock<std::mutex> locker(m_mutex_recv_q);
-                            m_recv_queue.push(M);
-                            m_conv_recv_q.notify_one();
-                        }
-                    }
-                    
-                    std::this_thread::sleep_for(std::chrono::seconds(2));
-                } catch (...)
+                // try 
+                // {   
+                int amount;
+                Message M;  
+                MPI_Status status;
+                MPI_Probe(MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status);
+                MPI_Get_count(&status, MPI_INT, &amount);
+                if (amount!=0)
                 {
-                    std::cout<< "In: error " << m_rank << "\n";
-                    throw;
+                    MPI_Recv(&M,amount, m_message_struct, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    {
+                        std::unique_lock<std::mutex> locker(m_mutex_recv_q);
+                        m_recv_queue.push(M);
+                        m_conv_recv_q.notify_one();
+                    }
                 }
-                counter++;
+                std::string s ="Node::Receive: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
+                std::cout<<s;
+                switch(M.getMessageType()){
+                    case Message::Message_Type::End:
+                        {
+                        // flag = false;
+                        break;
+                        }  
+                    case Message::Message_Type::WakeUp:
+                        {
+                        break;
+                        }
+                    case Message::Message_Type::Control:
+                        break;
+                    case Message::Message_Type::Announce:
+                        break;
+                    default:
+                        break;
+                }
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+                // } catch (...)
+                // {
+                //     std::cout<< "In: error " << m_rank << "\n";
+                //     throw;
+                // }
+                // counter++;
             }
         }
 
@@ -153,6 +171,25 @@ class Node
                     m_send_queue.pop();
                 }
                 MPI_Send(&M,1, m_message_struct, M.m_destination, 0, MPI_COMM_WORLD);
+                std::string s ="Node::Send: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
+                std::cout<<s;
+                switch(M.getMessageType()){
+                    case Message::Message_Type::End:
+                        {
+                        // flag = false;
+                        break;
+                        }  
+                    case Message::Message_Type::WakeUp:
+                        {
+                        break;
+                        }
+                    case Message::Message_Type::Control:
+                        break;
+                    case Message::Message_Type::Announce:
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
@@ -171,17 +208,16 @@ class Node
                     M = m_recv_queue.front();
                     m_recv_queue.pop();
                 }
-                std::string tempS = std::to_string(m_rank) + " value : " + std::to_string(M.m_data) + " from: " +  std::to_string(M.m_source) + " type: " + M.getMessageTypeStr() + " dest : " + std::to_string(M.m_destination) + "\n";
-                std::cout<< tempS;
+                std::string s = "Node::Process: " + m_name + " rank: " + std::to_string(m_rank) + " receive: " + M.getMessageTypeStr() + " from: " + std::to_string(M.m_source) + "\n";
+                std::cout<<s;
                 switch(M.getMessageType()){
                     case Message::Message_Type::End:
                         {
+                        // flag = false;
                         break;
                         }
-                        
                     case Message::Message_Type::WakeUp:
                         {
-                        std::cout<<"HERE\n";
                         break;
                         }
                     case Message::Message_Type::Control:
@@ -242,6 +278,11 @@ class Node
         void startElection(){
             for(int i = 0; i < m_neighbore.size(); i++){
                 addMessageToSendQueue(1, m_rank, 11, m_neighbore[i]);
+            }
+        }
+        void SendEnd(){
+            for(int i = 0; i < m_neighbore.size(); i++){
+                addMessageToSendQueue(0, m_rank, 11, m_neighbore[i]);
             }
         }
     private:
@@ -316,10 +357,9 @@ int main(int argc, char * argv[])
     {
         node.startThreads();
         if (rank==0){
-            // int destination = 3;
-            // // Message M(Message::WakeUp, rank, 11, destination);
-            // node.addMessageToSendQueue(1, rank, 11, destination);
             node.startElection();
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            node.SendEnd();
         }
         // std::this_thread::sleep_for(std::chrono::seconds(3));
         // node.change();
@@ -332,9 +372,7 @@ int main(int argc, char * argv[])
         throw;
     }
 
-    // MPI_Barrier(MPI_COMM_WORLD);
     node.terminateThreads();
-    // MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
     delete node_ptr;
     node_ptr = NULL;

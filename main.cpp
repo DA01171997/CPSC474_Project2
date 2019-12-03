@@ -23,15 +23,18 @@ class Node
             int m_type=0;
             int m_data=0;
             int m_source=0;
+            int m_destination=0;
 
-            Message(Message_Type type, int source, int data = 0) :  m_type(static_cast<int>(type)),
-                                                                    m_source(source),
-                                                                    m_data(data)
+            Message(Message_Type type, int source, int data = 0, int destination = 0) : m_type(static_cast<int>(type)), 
+                                                                                        m_source(source), 
+                                                                                        m_data(data),
+                                                                                        m_destination(destination)
             {
             }
-            Message(int type, int source, int data = 0) :   m_type(type),
-                                                            m_source(source),
-                                                            m_data(data)
+            Message(int type, int source, int data = 0, int destination = 0) :  m_type(type),
+                                                                                m_source(source),
+                                                                                m_data(data),
+                                                                                m_destination(destination)
             {
             }
             Message() {}
@@ -69,38 +72,18 @@ class Node
             }
         };
 
-        Node(){
-            int struct_member_variable_counter = 3;
-            int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1};
-            MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT};
-            MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] {offsetof(Message,m_type), offsetof(Message,m_data),offsetof(Message,m_source)};
-            // MPI_Datatype message_struct;
-            MPI_Type_create_struct( struct_member_variable_counter, 
-                                struct_member_variable_block_lengths,
-                                struct_member_variable_displacement,
-                                struct_member_variable_type_array,
-                                &message_struct
-                                );
-            MPI_Type_commit(&message_struct);
+        Node()
+        {
+            createMessageStruct();    
         }
         Node(int rank): m_rank(rank) {
-            int struct_member_variable_counter = 3;
-            int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1};
-            MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT};
-            MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] {offsetof(Message,m_type), offsetof(Message,m_data),offsetof(Message,m_source)};
-            // MPI_Datatype message_struct;
-            MPI_Type_create_struct( struct_member_variable_counter, 
-                                struct_member_variable_block_lengths,
-                                struct_member_variable_displacement,
-                                struct_member_variable_type_array,
-                                &message_struct
-                                );
-            MPI_Type_commit(&message_struct);
+            createMessageStruct();
         }
         Node(int rank, const std::string& name, const std::vector<int>& neighbore): m_rank(rank), 
                                                                                     m_name(name), 
                                                                                     m_neighbore(neighbore)
         {
+            createMessageStruct();
             m_buffer.reserve(m_neighbore.size());
             std::string validate_message = "Node: " + m_name + ", rank: " + std::to_string(m_rank) + ", neighbore: ";
             for(int i=0; i<m_neighbore.size(); i++)
@@ -109,22 +92,9 @@ class Node
             }
             validate_message += "\n";
             // std::cout << validate_message;
-            int struct_member_variable_counter = 3;
-            int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1};
-            MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT};
-            MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] {offsetof(Message,m_type), offsetof(Message,m_data),offsetof(Message,m_source)};
-            // MPI_Datatype message_struct;
-            MPI_Type_create_struct( struct_member_variable_counter, 
-                                struct_member_variable_block_lengths,
-                                struct_member_variable_displacement,
-                                struct_member_variable_type_array,
-                                &message_struct
-                                );
-            MPI_Type_commit(&message_struct);
         }
         ~Node()
         {
-            // terminateThreads();
             delete m_recv_thread; 
             m_recv_thread = NULL;
             delete m_send_thread;
@@ -133,45 +103,11 @@ class Node
             m_process_thread = NULL;
         }
 
-        void change()
-        {   
-            if(m_rank==4)
-            {
-                std::cout<<"value before1 : " << test << "\n";
-                std::unique_lock<std::mutex> locker(m_mutex);
-                test =4;
-                 std::cout<<"value before2 : " << test << "\n";
-                m_conv_recv_q.notify_one();
-            }
-
-        }
+        
         int getRank() const {return m_rank;}
 
         void Receive()
         {
-            // if(m_rank==4)
-            // {
-            //     bool flag = true;
-            //     int counter = 0;
-            //     // while (counter <2){
-            //     //     std::unique_lock<std::mutex> locker(m_mutex);
-            //     //     std::cout<<"value before : " << test << "\n";
-            //     //     std::this_thread::sleep_for(std::chrono::seconds(3));
-            //     //     counter++;
-            //     // }
-            //     std::cout<<"value after1 : " << test << "\n";
-            //     std::unique_lock<std::mutex> locker(m_mutex);
-            //     while (flag){
-            //         m_condV.wait(locker);
-            //         if (test!=0){
-            //             std::cout<<"value after2 : " << test << "\n";
-            //             flag = false;
-            //         }
-                    
-            //     }
-            
-            // } int
-
             int counter = 0;         
             while((counter <10))
             {
@@ -185,15 +121,10 @@ class Node
                     if (amount!=0)
                     {
                         MPI_Recv(&M,amount, message_struct, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                        // MPI_Recv(&blah,1, MPI_INT, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                        // std::cout<< "value : " << M.m_data << " from: " << M.m_source << "\n";
                         {
                             std::unique_lock<std::mutex> locker(m_mutex);
-                            // std::cout<< "size before " << m_recv_queue.size() << " rank " << m_rank << "\n";
                             m_recv_queue.push(M);
-                            // std::cout<< "size after " << m_recv_queue.size() << " rank " << m_rank << "\n";
                             m_conv_recv_q.notify_one();
-                            // std::cout<<"HERE " << m_rank << "\n";
                         }
                     }
                     
@@ -201,50 +132,38 @@ class Node
                 } catch (...)
                 {
                     std::cout<< "In: error " << m_rank << "\n";
-                    // terminateThreads();
                     throw;
                 }
                 counter++;
             }
-            // MPI_Barrier(MPI_COMM_WORLD);
         }
 
         void Send()
         {
             if (m_rank==3) 
             {
-                Message M (Message::WakeUp, m_rank, 9);
-                MPI_Send(&M,1, message_struct, 4, 0, MPI_COMM_WORLD);
-                // MPI_Send(&blah,1, MPI_INT, 2, 0, MPI_COMM_WORLD);
-                // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
+                int destination = 4;
+                Message M (Message::WakeUp, m_rank, 9, destination);
+                MPI_Send(&M,1, message_struct, destination, 0, MPI_COMM_WORLD);
             }
             if (m_rank==4) 
             {
-                Message M (Message::WakeUp, m_rank, 10);
-                MPI_Send(&M,1, message_struct, 2, 0, MPI_COMM_WORLD);
-                // MPI_Send(&blah,1, MPI_INT, 2, 0, MPI_COMM_WORLD);
-                // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
+                int destination = 2;
+                Message M (Message::WakeUp, m_rank, 10, destination);
+                MPI_Send(&M,1, message_struct, destination, 0, MPI_COMM_WORLD);
             }
             if (m_rank==4) 
             {
-                Message M (Message::WakeUp, m_rank, 11);
-                MPI_Send(&M,1, message_struct, 3, 0, MPI_COMM_WORLD);
-                // MPI_Send(&blah,1, MPI_INT, 2, 0, MPI_COMM_WORLD);
-                // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
+                int destination = 3;
+                Message M (Message::WakeUp, m_rank, 11, destination);
+                MPI_Send(&M,1, message_struct, destination, 0, MPI_COMM_WORLD);
             }
             if (m_rank==5) 
             {
-                Message M (Message::WakeUp, m_rank, 12);
-                MPI_Send(&M,1, message_struct, 3, 0, MPI_COMM_WORLD);
-                // MPI_Send(&blah,1, MPI_INT, 2, 0, MPI_COMM_WORLD);
-                // MPI_Bcast(&blah,1, MPI_INT,3, MPI_COMM_WORLD);
+                int destination = 3;
+                Message M (Message::WakeUp, m_rank, 12, destination = 3);
+                MPI_Send(&M,1, message_struct, destination, 0, MPI_COMM_WORLD);
             }
-            // MPI_Barrier(MPI_COMM_WORLD);
-            // bool flag = true; 
-            // while (flag)
-            // {
-                
-            // }
         }
 
         void Process()
@@ -259,13 +178,29 @@ class Node
                     {
                         m_conv_recv_q.wait(locker);
                     }
-                    // std::string tempM= "I got one " + std::to_string(m_rank) + "\n";
-                    // std::cout <<tempM;
-
                     M = m_recv_queue.front();
                     m_recv_queue.pop();
                 }
-                // std::cout<< "value : " << M.m_data << " from: " << M.m_source << "\n";
+                std::string tempS = std::to_string(m_rank) + " value : " + std::to_string(M.m_data) + " from: " +  std::to_string(M.m_source) + " type: " + M.getMessageTypeStr() + " dest : " + std::to_string(M.m_destination) + "\n";
+                std::cout<< tempS;
+                switch(M.getMessageType()){
+                    case Message::Message_Type::End:
+                        {
+                        break;
+                        }
+                        
+                    case Message::Message_Type::WakeUp:
+                        {
+                        std::cout<<"HERE\n";
+                        break;
+                        }
+                    case Message::Message_Type::Control:
+                        break;
+                    case Message::Message_Type::Announce:
+                        break;
+                    default:
+                        break;
+                }
                 
             }
         }
@@ -300,8 +235,6 @@ class Node
             {
                 m_process_thread->join();
             }
-            
-            // MPI_Barrier(MPI_COMM_WORLD);
         }
     private:
         int m_rank;
@@ -318,6 +251,23 @@ class Node
         std::condition_variable m_conv_recv_q;
         MPI_Datatype message_struct;
         Message m_recv_msg; 
+        void createMessageStruct()
+        {   
+            int struct_member_variable_counter = 4;
+            int struct_member_variable_block_lengths[struct_member_variable_counter] = {1,1,1,1};
+            MPI_Datatype struct_member_variable_type_array[struct_member_variable_counter] = {MPI_INT, MPI_INT, MPI_INT,MPI_INT};
+            MPI_Aint struct_member_variable_displacement[struct_member_variable_counter] {  offsetof(Message,m_type),
+                                                                                            offsetof(Message,m_data),
+                                                                                            offsetof(Message,m_source),
+                                                                                            offsetof(Message,m_destination)};
+            MPI_Type_create_struct( struct_member_variable_counter, 
+                                struct_member_variable_block_lengths,
+                                struct_member_variable_displacement,
+                                struct_member_variable_type_array,
+                                &message_struct
+                                );
+            MPI_Type_commit(&message_struct);
+        }
 };
 
 

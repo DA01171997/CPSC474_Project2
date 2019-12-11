@@ -1,6 +1,8 @@
 # CPSC474_Project2
-## DUY DO
-## duy.ado@csu.fullerton.edu
+
+<b>DUY DO</b><br />
+<b>duy.ado@csu.fullerton.edu</b><br />
+
 
 # Instruction to run and compile 
 ## 1 Start docker 
@@ -18,7 +20,7 @@ Node 0 is reserved for starting the algorithm. Node 0 need to have every partici
 
 In the current topology there are 6 nodes (node 1-6) participating in the tree election, plus node 0 is 7 nodes.</br>
 
-That's why main will check and fail if size!=7 (mpirun -n 7 ./main.exe), this value need to be change according if the tree topology changes.</br>
+That's why main will check and fail if size!=7 (mpirun -n 7 ./main.exe), this value need to be change according both inside main.cpp and "mpirun -n size", if the tree topology changes.</br>
 
 # Sources
 

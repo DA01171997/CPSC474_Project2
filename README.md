@@ -1,5 +1,24 @@
 # CPSC474_Project2
-start docker, then call make, then run mpirun -n 7 ./main.exe
+## DUY DO
+## duy.ado@csu.fullerton.edu
+
+# Instruction to run and compile 
+## 1 Start docker 
+./start_docker.sh
+## 2 Make
+make
+## 3 Run
+mpirun -n 7 ./main.exe
+
+# Note
+
+Referred for topology.png to understand how the node is created in main.cpp </br>
+
+Node 0 is reserved for starting the algorithm. Node 0 need to have every participating neighbore included in it neightbore vector. So set std::vector<int> neighbore0 {1,2,3,..with all neightbore};</br>
+
+In the current topology there are 6 nodes (node 1-6) participating in the tree election, plus node 0 is 7 nodes.</br>
+
+That's why main will check and fail if size!=7 (mpirun -n 7 ./main.exe), this value need to be change according if the tree topology changes.</br>
 
 # Sources
 

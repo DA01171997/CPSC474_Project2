@@ -7,9 +7,9 @@
 # Instruction to run and compile 
 ## 1 Start docker 
 ./start_docker.sh
-## 2 Make
+## 2 Make inside docker
 make
-## 3 Run
+## 3 Run inside docker
 mpirun -n 7 ./main.exe
 
 # Note

@@ -1,4 +1,4 @@
-# CPSC474_Project2
+# Distributed-System-Tree-Election-MPI
 
 <b>DUY DO</b><br />
 <b>duy.ado@csu.fullerton.edu</b><br />
